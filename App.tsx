@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AdminDashboard } from './components/AdminDashboard';
 import { GuestLookup } from './components/GuestLookup';
+import { GuestLookupFromDB } from './components/GuestLookupFromDB';
 import { AppMode, Guest, Table } from './types';
 
 function App() {
@@ -8,15 +9,23 @@ function App() {
   const [tables, setTables] = useState<Table[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check URL parameters to determine mode
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
-    if (view === 'guest') {
+    const plan = params.get('plan');
+
+    // If we have a plan ID, use the database-backed guest lookup
+    if (plan) {
+      setPlanId(plan);
+      setMode(AppMode.GUEST_LOOKUP);
+    } else if (view === 'guest') {
+      // Legacy support for localStorage-based guest lookup
       setMode(AppMode.GUEST_LOOKUP);
     }
-    
+
     // Load state from localStorage to persist data across page reloads (simulating backend)
     const savedData = localStorage.getItem('seatsmart_data');
     if (savedData) {
@@ -49,15 +58,19 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       {mode === AppMode.ADMIN ? (
-        <AdminDashboard 
-          initialData={{ tables, guests }} 
+        <AdminDashboard
+          initialData={{ tables, guests }}
           onDataUpdate={handleDataUpdate}
           publicUrl={publicUrl}
         />
+      ) : planId ? (
+        // Use database-backed guest lookup when plan ID is present
+        <GuestLookupFromDB planId={planId} />
       ) : (
-        <GuestLookup 
-          guests={guests} 
-          tables={tables} 
+        // Fallback to localStorage-based guest lookup for legacy URLs
+        <GuestLookup
+          guests={guests}
+          tables={tables}
         />
       )}
     </div>
