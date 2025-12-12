@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Users, Layers, Share2, RotateCcw, LayoutGrid, CheckSquare, Square, Plus } from 'lucide-react';
+import { Users, Layers, Share2, RotateCcw, LayoutGrid, CheckSquare, Square, Plus, Save, Loader2 } from 'lucide-react';
 import { Table, Guest, AssignmentResult } from '../types';
 import { processGuestList, assignGuestsToTable } from '../utils/core';
 import { TableCard } from './TableCard';
 import { DEFAULT_TABLE_COUNT, DEFAULT_CAPACITY, MAX_CAPACITY } from '../constants';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AdminDashboardProps {
   initialData?: { tables: Table[]; guests: Guest[] };
@@ -28,6 +29,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialData, onD
   // Add guest state
   const [newGuestInput, setNewGuestInput] = useState('');
   const [showAddGuest, setShowAddGuest] = useState(false);
+
+  // Save to database state
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedPlanId, setSavedPlanId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Initialize tables if empty
   useEffect(() => {
@@ -170,6 +176,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialData, onD
     }
   };
 
+  // Save seating plan to database
+  const handleSaveToDatabase = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const planId = savedPlanId || uuidv4();
+
+      const response = await fetch('/api/seating', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: planId,
+          tables,
+          guests,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save seating plan');
+      }
+
+      const data = await response.json();
+      setSavedPlanId(data.id);
+      setStep(3);
+    } catch (error) {
+      console.error('Error saving to database:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save seating plan');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // UI Components for steps
   const renderStep1 = () => (
     <div className="space-y-6">
@@ -271,19 +313,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialData, onD
              </p>
           </div>
           <div className="flex gap-2">
-             <button 
+             <button
                onClick={() => setStep(1)}
                className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium flex items-center gap-2"
              >
                <RotateCcw size={16} /> Reset
              </button>
-             <button 
-               onClick={() => setStep(3)}
-               className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm"
+             <button
+               onClick={handleSaveToDatabase}
+               disabled={isSaving || guests.filter(g => g.tableId).length === 0}
+               className="px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm"
              >
-               <Share2 size={16} /> Generate QR
+               {isSaving ? (
+                 <>
+                   <Loader2 size={16} className="animate-spin" /> Saving...
+                 </>
+               ) : (
+                 <>
+                   <Save size={16} /> Save & Share
+                 </>
+               )}
              </button>
           </div>
+          {saveError && (
+            <p className="text-red-500 text-sm mt-2">{saveError}</p>
+          )}
         </div>
 
         <div className="flex gap-6" style={{ minHeight: 0 }}>
@@ -501,41 +555,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialData, onD
     );
   };
 
-  const renderStep3 = () => (
-    <div className="flex flex-col items-center justify-center h-[calc(100vh-140px)]">
-      <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center max-w-md w-full">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Event Ready!</h2>
-        <p className="text-gray-500 mb-8">Scan to find your seat</p>
-        
-        <div className="bg-white p-4 rounded-xl shadow-inner border border-gray-100 inline-block mb-8">
-           <QRCodeCanvas 
-             value={publicUrl} 
-             size={250}
-             level={"H"}
-             includeMargin={true}
-           />
-        </div>
+  const renderStep3 = () => {
+    // Build the guest lookup URL with plan ID
+    const baseUrl = window.location.href.split('?')[0];
+    const guestLookupUrl = savedPlanId ? `${baseUrl}?plan=${savedPlanId}` : publicUrl;
 
-        <div className="flex flex-col gap-3">
-            <a 
-              href={publicUrl} 
-              target="_blank" 
-              rel="noreferrer"
-              className="block w-full py-3 px-4 bg-indigo-50 text-indigo-700 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm break-all"
-            >
-              {publicUrl}
-            </a>
-            
-            <button 
-              onClick={() => setStep(2)}
-              className="text-gray-500 hover:text-gray-800 text-sm font-medium mt-4"
-            >
-              ← Back to Adjustments
-            </button>
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-140px)]">
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 text-center max-w-md w-full">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event Ready!</h2>
+          <p className="text-gray-500 mb-2">Scan to find your seat</p>
+          {savedPlanId && (
+            <p className="text-emerald-600 text-sm mb-6 flex items-center justify-center gap-1">
+              <Save size={14} /> Saved to database
+            </p>
+          )}
+
+          <div className="bg-white p-4 rounded-xl shadow-inner border border-gray-100 inline-block mb-8">
+             <QRCodeCanvas
+               value={guestLookupUrl}
+               size={250}
+               level={"H"}
+               includeMargin={true}
+             />
+          </div>
+
+          <div className="flex flex-col gap-3">
+              <a
+                href={guestLookupUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block w-full py-3 px-4 bg-indigo-50 text-indigo-700 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm break-all"
+              >
+                {guestLookupUrl}
+              </a>
+
+              <button
+                onClick={() => setStep(2)}
+                className="text-gray-500 hover:text-gray-800 text-sm font-medium mt-4"
+              >
+                ← Back to Adjustments
+              </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-screen flex flex-col">
