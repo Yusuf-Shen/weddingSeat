@@ -153,7 +153,7 @@ export const GuestLookupFromDB: React.FC<GuestLookupFromDBProps> = ({ planId }) 
         )}
 
         <p className="mt-12 text-center text-white/30 text-xs">
-          Powered by SeatSmart AI
+          Powered by Event Seat
         </p>
       </div>
     </div>

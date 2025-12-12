@@ -93,7 +93,7 @@ export const GuestLookup: React.FC<GuestLookupProps> = ({ guests, tables }) => {
         )}
         
         <p className="mt-12 text-center text-white/30 text-xs">
-          Powered by SeatSmart AI
+          Powered by Event Seat
         </p>
       </div>
     </div>

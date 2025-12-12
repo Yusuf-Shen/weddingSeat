@@ -609,7 +609,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialData, onD
           <div className="bg-indigo-600 p-2 rounded-lg text-white">
             <LayoutGrid size={24} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">SeatSmart <span className="text-indigo-600">AI</span></h1>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Event <span className="text-indigo-600">Seat</span></h1>
         </div>
         <div className="flex items-center gap-4 text-sm font-medium text-gray-500">
            <span className={step === 1 ? "text-indigo-600" : ""}>1. Setup</span>
